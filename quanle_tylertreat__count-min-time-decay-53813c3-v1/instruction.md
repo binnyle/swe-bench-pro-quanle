@@ -13,9 +13,8 @@ naturally decay over time.
    half-life). The existing `NewCountMinSketch` constructor must continue to work
    unchanged (no decay = legacy behavior).
 
-2. `Add()` and `AddN()` must account for elapsed time since the last operation on
-   the sketch, applying appropriate decay to existing counts before incrementing.
-   New items added after decay should reflect their full count, not a decayed value.
+2. `Add()` and `AddN()` must account for elapsed time, applying appropriate decay
+   to existing counts before incrementing.
 
 3. `Count()` must return the time-adjusted frequency estimate, not the raw
    accumulated count.
@@ -25,7 +24,7 @@ naturally decay over time.
    must return an error.
 
 5. A new `Decay()` method must allow explicit manual decay application (useful for
-   batch processing). It must return the sketch to allow method chaining.
+   batch processing).
 
 6. Serialization (`WriteDataTo`/`ReadDataFrom`) must preserve decay state so that a
    deserialized sketch produces the same counts as the original.
@@ -34,9 +33,7 @@ naturally decay over time.
 
 ## Constraints
 
-- Memory overhead for decay tracking should be O(1) additional space (not per-cell).
-- Decay must use an exponential model: `count * e^(-λt)` where `λ = ln(2)/half_life`.
-- When converting decayed float values back to uint64 counters, use rounding (not
-   truncation) to avoid losing counts from tiny time deltas.
+- Decay must use an exponential model with the half-life parameter determining how
+   quickly counts diminish.
 - When decay rate is 0 (or half-life is 0), behavior must be identical to the
    existing implementation.
