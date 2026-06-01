@@ -1,0 +1,31 @@
+{
+    "repo": "tylertreat/BoomFilters",
+    "instance_id": "quanle_tylertreat__count-min-time-decay-53813c3-v1",
+    "base_commit": "53813c3",
+    "patch": "",
+    "test_patch": "",
+    "fail_to_pass": [
+        "TestNewCountMinSketchWithDecay",
+        "TestZeroDecayBehavior",
+        "TestDecayReducesCounts",
+        "TestDecayAfterTwoHalfLives",
+        "TestAddAfterDecay",
+        "TestDecayMethod",
+        "TestTotalCountDecays",
+        "TestMergeDecayedSketches",
+        "TestMergeDecayRateMismatch",
+        "TestSerializationWithDecay",
+        "TestLegacyConstructorUnchanged"
+    ],
+    "pass_to_pass": [
+        "TestCMSTotalCount",
+        "TestCMSAddNAndCount",
+        "TestCMSAddAndCount",
+        "TestCMSMerge",
+        "TestCMSReset",
+        "TestCMSSerialization",
+        "TestCMSTestAndRemove"
+    ],
+    "selected_test_files_to_run": [],
+    "before_repo_set_cmd": ""
+}
