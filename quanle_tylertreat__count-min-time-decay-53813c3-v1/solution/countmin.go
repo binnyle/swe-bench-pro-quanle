@@ -199,6 +199,71 @@ func (c *CountMinSketch) Merge(other *CountMinSketch) error {
 	return nil
 }
 
+// Subtract computes the per-cell difference between this sketch and another.
+// Cells that would underflow are clamped to zero. After subtraction, the count
+// field is recomputed from the matrix. Returns an error if dimensions or decay
+// rates don't match.
+func (c *CountMinSketch) Subtract(other *CountMinSketch) error {
+	if c.depth != other.depth {
+		return errors.New("matrix depth must match")
+	}
+
+	if c.width != other.width {
+		return errors.New("matrix width must match")
+	}
+
+	c.applyDecay()
+	other.applyDecay()
+
+	if c.decayRate != other.decayRate {
+		return errors.New("decay rate must match")
+	}
+
+	for i := uint(0); i < c.depth; i++ {
+		for j := uint(0); j < c.width; j++ {
+			if c.matrix[i][j] > other.matrix[i][j] {
+				c.matrix[i][j] -= other.matrix[i][j]
+			} else {
+				c.matrix[i][j] = 0
+			}
+		}
+	}
+
+	// Recompute count from matrix — sum the minimum across rows for each column
+	// is not meaningful, so we use the sum of the first row as an approximation.
+	// The correct approach: sum all cells in one row (any row works since they
+	// should have similar totals due to the CMS property).
+	var total uint64
+	for j := uint(0); j < c.width; j++ {
+		total += c.matrix[0][j]
+	}
+	c.count = total
+
+	return nil
+}
+
+// CountDiff returns the signed frequency difference for a specific element
+// between this sketch and another. The difference is computed per-cell
+// (subtract corresponding cells) then takes the minimum across rows.
+// This is NOT the same as Count(data) - other.Count(data).
+func (c *CountMinSketch) CountDiff(data []byte, other *CountMinSketch) int64 {
+	c.applyDecay()
+	other.applyDecay()
+
+	lower, upper := hashKernel(data, c.hash)
+	var diff int64 = math.MaxInt64
+
+	for i := uint(0); i < c.depth; i++ {
+		idx := (uint(lower) + uint(upper)*i) % c.width
+		cellDiff := int64(c.matrix[i][idx]) - int64(other.matrix[i][idx])
+		if cellDiff < diff {
+			diff = cellDiff
+		}
+	}
+
+	return diff
+}
+
 // Reset restores the CountMinSketch to its original state. It returns itself
 // to allow for chaining.
 func (c *CountMinSketch) Reset() *CountMinSketch {

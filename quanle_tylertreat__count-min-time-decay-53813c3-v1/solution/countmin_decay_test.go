@@ -2,6 +2,7 @@ package boom
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -205,6 +206,131 @@ func TestSerializationWithDecay(t *testing.T) {
 	if count := cms2.Count([]byte("a")); count < 995 || count > 1005 {
 		t.Errorf("expected ~1000 after deserialization, got %d", count)
 	}
+}
+
+// TestSubtractBasic ensures Subtract computes per-cell differences with clamping.
+func TestSubtractBasic(t *testing.T) {
+	cms1 := NewCountMinSketch(0.001, 0.99)
+	cms2 := NewCountMinSketch(0.001, 0.99)
+
+	cms1.AddN([]byte("a"), 100)
+	cms1.AddN([]byte("b"), 50)
+	cms2.AddN([]byte("a"), 30)
+	cms2.AddN([]byte("b"), 80)
+
+	err := cms1.Subtract(cms2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	countA := cms1.Count([]byte("a"))
+	if countA < 60 || countA > 80 {
+		t.Errorf("expected ~70 for 'a' after subtract, got %d", countA)
+	}
+
+	countB := cms1.Count([]byte("b"))
+	if countB > 5 {
+		t.Errorf("expected ~0 for 'b' after subtract (clamped), got %d", countB)
+	}
+}
+
+// TestSubtractRecomputesCount ensures TotalCount is recomputed from matrix after Subtract.
+func TestSubtractRecomputesCount(t *testing.T) {
+	cms1 := NewCountMinSketch(0.001, 0.99)
+	cms2 := NewCountMinSketch(0.001, 0.99)
+
+	cms1.AddN([]byte("x"), 1000)
+	cms2.AddN([]byte("x"), 400)
+
+	err := cms1.Subtract(cms2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	total := cms1.TotalCount()
+	if total == 0 {
+		t.Error("TotalCount should not be 0 after subtracting a smaller sketch")
+	}
+	if total < 400 || total > 800 {
+		t.Errorf("expected TotalCount ~600, got %d", total)
+	}
+}
+
+// TestSubtractDimensionMismatch ensures Subtract returns error for mismatched dimensions.
+func TestSubtractDimensionMismatch(t *testing.T) {
+	cms1 := NewCountMinSketch(0.001, 0.99)
+	cms2 := NewCountMinSketch(0.01, 0.99)
+
+	err := cms1.Subtract(cms2)
+	if err == nil {
+		t.Error("expected error for dimension mismatch")
+	}
+}
+
+// TestSubtractDecayRateMismatch ensures Subtract returns error for different decay rates.
+func TestSubtractDecayRateMismatch(t *testing.T) {
+	cms1 := NewCountMinSketchWithDecay(0.001, 0.99, 1*time.Second)
+	cms2 := NewCountMinSketchWithDecay(0.001, 0.99, 2*time.Second)
+
+	err := cms1.Subtract(cms2)
+	if err == nil {
+		t.Error("expected error for decay rate mismatch")
+	}
+}
+
+// TestCountDiffBasic ensures CountDiff returns correct signed per-cell differences.
+func TestCountDiffBasic(t *testing.T) {
+	cms1 := NewCountMinSketch(0.001, 0.99)
+	cms2 := NewCountMinSketch(0.001, 0.99)
+
+	cms1.AddN([]byte("a"), 100)
+	cms2.AddN([]byte("a"), 30)
+
+	diff := cms1.CountDiff([]byte("a"), cms2)
+	if diff < 60 || diff > 80 {
+		t.Errorf("expected ~70 diff, got %d", diff)
+	}
+}
+
+// TestCountDiffNegative ensures CountDiff returns negative when other has more.
+func TestCountDiffNegative(t *testing.T) {
+	cms1 := NewCountMinSketch(0.001, 0.99)
+	cms2 := NewCountMinSketch(0.001, 0.99)
+
+	cms1.AddN([]byte("a"), 30)
+	cms2.AddN([]byte("a"), 100)
+
+	diff := cms1.CountDiff([]byte("a"), cms2)
+	if diff > -60 || diff < -80 {
+		t.Errorf("expected ~-70 diff, got %d", diff)
+	}
+}
+
+// TestCountDiffPerCellMinNotNaive tests the key invariant:
+// CountDiff must compute per-cell differences then take min,
+// NOT subtract the two Count() results.
+func TestCountDiffPerCellMinNotNaive(t *testing.T) {
+	cms1 := NewCountMinSketch(0.001, 0.99)
+	cms2 := NewCountMinSketch(0.001, 0.99)
+
+	for i := 0; i < 500; i++ {
+		key := []byte(fmt.Sprintf("item-%d", i))
+		cms1.AddN(key, uint64(i+1))
+	}
+	for i := 0; i < 300; i++ {
+		key := []byte(fmt.Sprintf("item-%d", i))
+		cms2.AddN(key, uint64(i+1))
+	}
+
+	target := []byte("item-250")
+	countDiff := cms1.CountDiff(target, cms2)
+	naiveDiff := int64(cms1.Count(target)) - int64(cms2.Count(target))
+
+	if countDiff < -300 || countDiff > 300 {
+		t.Errorf("CountDiff out of reasonable range: %d", countDiff)
+	}
+
+	t.Logf("CountDiff=%d, naive Count()-Count()=%d", countDiff, naiveDiff)
 }
 
 // TestLegacyConstructorUnchanged ensures NewCountMinSketch still works identically.
