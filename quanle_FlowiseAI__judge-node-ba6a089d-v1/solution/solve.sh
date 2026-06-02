@@ -4,10 +4,10 @@ set -euo pipefail
 
 cd /app
 
-# TODO: Apply the solution patch
-# cat > solution_patch.diff << '__SOLUTION__'
-# <your git diff here>
-# __SOLUTION__
-# git apply --verbose solution_patch.diff
+# Create the Verifier node directory
+mkdir -p packages/components/nodes/agentflow/Verifier
+
+# Copy the solution file into place
+cp /solution/Verifier.ts packages/components/nodes/agentflow/Verifier/Verifier.ts
 
 echo "Solution applied successfully"
