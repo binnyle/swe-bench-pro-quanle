@@ -229,15 +229,18 @@ func (c *CountMinSketch) Subtract(other *CountMinSketch) error {
 		}
 	}
 
-	// Recompute count from matrix — sum the minimum across rows for each column
-	// is not meaningful, so we use the sum of the first row as an approximation.
-	// The correct approach: sum all cells in one row (any row works since they
-	// should have similar totals due to the CMS property).
-	var total uint64
-	for j := uint(0); j < c.width; j++ {
-		total += c.matrix[0][j]
+	// Recompute count from matrix. Each row is an independent frequency
+	// estimator, so take the minimum row sum for the best estimate.
+	c.count = math.MaxUint64
+	for i := uint(0); i < c.depth; i++ {
+		var rowSum uint64
+		for j := uint(0); j < c.width; j++ {
+			rowSum += c.matrix[i][j]
+		}
+		if rowSum < c.count {
+			c.count = rowSum
+		}
 	}
-	c.count = total
 
 	return nil
 }

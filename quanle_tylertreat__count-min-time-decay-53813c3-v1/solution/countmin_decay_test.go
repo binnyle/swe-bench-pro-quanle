@@ -3,6 +3,7 @@ package boom
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -265,6 +266,9 @@ func TestSubtractDimensionMismatch(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for dimension mismatch")
 	}
+	if err != nil && !strings.Contains(err.Error(), "width") && !strings.Contains(err.Error(), "depth") && !strings.Contains(err.Error(), "match") && !strings.Contains(err.Error(), "dimension") {
+		t.Errorf("error should mention dimension mismatch, got: %v", err)
+	}
 }
 
 // TestSubtractDecayRateMismatch ensures Subtract returns error for different decay rates.
@@ -275,6 +279,9 @@ func TestSubtractDecayRateMismatch(t *testing.T) {
 	err := cms1.Subtract(cms2)
 	if err == nil {
 		t.Error("expected error for decay rate mismatch")
+	}
+	if err != nil && !strings.Contains(err.Error(), "decay") && !strings.Contains(err.Error(), "rate") && !strings.Contains(err.Error(), "match") {
+		t.Errorf("error should mention decay rate mismatch, got: %v", err)
 	}
 }
 
