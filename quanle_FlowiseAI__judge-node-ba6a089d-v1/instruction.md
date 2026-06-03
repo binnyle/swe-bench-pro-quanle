@@ -1,39 +1,27 @@
 # Build a Verifier/Gate Node for Flowise
 
-## Problem
+## What to build
 
-Flowise lets users build LLM workflows visually, but there's no way to verify the quality of an upstream output before the flow continues. Bad outputs pass through unchecked — a problem in deployments where wrong answers are costly. There's no primitive for evaluating correctness, groundedness, or safety, and no way to abstain when confidence is too low.
+A new Flowise **AgentFlow** node called **Verifier** that takes an upstream output, runs a verification check, and routes the flow to **one of three branches** — **Pass**, **Abstain**, or **Fail** — based on the result.
 
-## Feature: Verifier (Gate) Node
+The node must support **three verification modes**, selectable via a `mode` input. **All three are required** — a submission that implements only some of them is incomplete:
 
-A new node that evaluates upstream output and routes to one of three branches based on the result.
+- **`schema`** — validate the output against a provided JSON schema. No model call.
+- **`groundedness`** — check that the output's claims are supported by a supplied context, using a deterministic check. No model call.
+- **`llm_judge`** — call a configurable judge model that returns a `0–1` score for faithfulness/relevance. (Default mode.)
 
-### Verification Modes
+How each check is implemented internally is up to you — what matters is the observable behavior and output contract below.
 
-| Mode | What it does | Model call? |
-|------|-------------|-------------|
-| `schema` | Validates output against a JSON schema / required-fields rule | No |
-| `groundedness` | Checks that claims in the output are supported by supplied context (deterministic containment/overlap) | No |
-| `llm_judge` | Calls a configurable judge model that returns a 0–1 score for faithfulness/relevance | Yes |
+## Why
 
-### Routing Logic
+Flowise lets users build LLM workflows visually, but there's no primitive to verify the quality of an upstream output before the flow continues. Bad outputs pass through unchecked — costly where wrong answers matter. This node adds the ability to accept, reject, or abstain on an output before it propagates.
 
-The node compares the verification score against two thresholds and routes to exactly one branch:
-
-```
-score >= passThreshold       → PASS    (output accepted, continue)
-abstainThreshold <= score < passThreshold → ABSTAIN (confidence too low, escalate)
-score < abstainThreshold     → FAIL    (output rejected, retry/fallback)
-```
-
-For `schema` and `groundedness` modes (binary results), map: valid → score 1.0, invalid → score 0.0.
-
-### Node Inputs
+## Inputs
 
 | Input | Type | Default | Notes |
 |-------|------|---------|-------|
 | `mode` | enum: `schema`, `groundedness`, `llm_judge` | `llm_judge` | |
-| `inputToCheck` | string/variable | — | Upstream field to evaluate |
+| `inputToCheck` | string/variable | — | Upstream output to evaluate |
 | `context` | string/variable | — | Reference context (used by `groundedness`) |
 | `schema` | JSON | — | Shown only when `mode = schema` |
 | `judgeModel` | chat model connection | — | Shown only when `mode = llm_judge` |
@@ -41,24 +29,61 @@ For `schema` and `groundedness` modes (binary results), map: valid → score 1.0
 | `abstainThreshold` | number 0–1 | 0.4 | |
 | `onError` | enum: `fail`, `abstain` | `abstain` | How to route if the check itself errors |
 
-### Output
+## Routing
 
-- Routes to one of three output branches: **pass**, **fail**, **abstain**
-- Writes decision, score, and reason to flow state for downstream nodes
+Each mode produces a numeric `score` in `[0, 1]`, routed to exactly one branch:
+
+
+score >= passThreshold → PASS (output accepted, continue) abstainThreshold <= score < passThreshold → ABSTAIN (confidence too low, escalate) score < abstainThreshold → FAIL (output rejected, retry/fallback)
+
+
+## Per-mode behavior
+
+### `schema`
+- `inputToCheck` is parsed as JSON and validated against the `schema` JSON. Validation checks **both** required fields **and** declared property types (e.g. a field typed `number` must be a number).
+- Valid → `score 1.0` (Pass). Invalid → `score 0.0` (Fail).
+- `reason` must name the cause of failure so it is actionable: include the **missing/mismatched field name** when a field is missing or has the wrong type, and the phrase **`not valid JSON`** when `inputToCheck` cannot be parsed as JSON.
+- If no `schema` is provided → `fail`, `score 0`.
+
+### `groundedness`
+- Deterministically compare `inputToCheck` against `context`. Output well-supported by the context → high score (Pass band); unsupported or contradicted → low score (Fail/Abstain band).
+- If no `context` is provided, or `inputToCheck` is empty → `fail`, `score 0`.
+
+### `llm_judge`
+- Call the configured `judgeModel`; parse a numeric `score` in `[0, 1]` and a `reason` from its response. The returned score is routed through the normal threshold logic.
+- Implement the judge-model call in a **separate async method named `checkLLMJudge()`** that returns `{ score, reason }`, so the network path can be tested in isolation.
+- If no `judgeModel` is configured (or the call fails), treat it as an error (see Error handling).
+
+## Expected output (return contract)
+
+`run(...)` must resolve to an object `{ id, name, input, output, state }`:
+
+- `name` equals the node's `name` (`verifierAgentflow`).
+- `output` is `{ conditions, decision, score, reason }`:
+  - `decision` ∈ `pass | abstain | fail`
+  - `score` ∈ `[0, 1]`
+  - `reason` — human-readable string explaining the decision
+  - `conditions` — an array of **exactly three** entries, one per branch, each `{ type: 'pass' | 'abstain' | 'fail', isFulfilled: boolean }`. **Exactly one** has `isFulfilled: true`, matching `decision`. (Mirrors the existing Condition / ConditionAgentflow nodes.)
+- `state` — the updated flow state: write `verifier_decision`, `verifier_score`, and `verifier_reason`, **preserving all pre-existing keys**.
+
+## Error handling
+
+If the selected mode throws (including `llm_judge` with no model configured), set `score = 0`, set `reason` to a message containing the word `"error"`, and route according to `onError` (default `abstain`).
+
+## Node identity & registration
+
+| Property | Value |
+|----------|-------|
+| `name` | `verifierAgentflow` |
+| `category` | `Agent Flows` |
+| `type` | `Verifier` |
+| Output labels | `Pass`, `Abstain`, `Fail` (in that order) |
+
+Export the node class as **`nodeClass`** from the node module (NodesPool convention).
 
 ## Constraints
 
-- TypeScript, matching existing node conventions
-- No frontend changes — UI generated from node input metadata
-- No new heavy dependencies
-- Must pass lint and build with no regressions
-
-## Definition of Done
-
-1. All three modes route correctly to pass/fail/abstain on test inputs
-2. Decision, score, and reason are readable by downstream nodes
-3. Lint and build pass cleanly
-
-## Future (Out of Scope)
-
-- `conformal` calibration mode (threshold derived from a held-out calibration set) — design should accommodate this without restructuring
+- TypeScript, matching existing AgentFlow node conventions (input metadata for UI generation, `loadMethods`, `updateFlowState`).
+- No frontend changes — UI is generated from node input metadata.
+- New file must type-check and build cleanly; no new heavy dependencies.
+- Must pass lint and build with no regressions.
