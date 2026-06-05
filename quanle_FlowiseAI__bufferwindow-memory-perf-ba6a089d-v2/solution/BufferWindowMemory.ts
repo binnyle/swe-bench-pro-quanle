@@ -121,16 +121,24 @@ class BufferWindowMemoryExtended extends FlowiseWindowMemory implements MemoryMe
         let chatMessage: any[] = []
 
         if (this.k > 0) {
-            // Only fetch the last k*2 messages from the database instead of loading the
-            // entire conversation history and slicing it down in application memory. This
-            // keeps retrieval bounded by the window size, independent of conversation length.
+            // Only fetch the window we actually use instead of loading the entire
+            // conversation and discarding most of it, so retrieval stays bounded by the
+            // window size, independent of conversation length.
+            //
+            // createdDate is not unique (messages can be persisted with identical
+            // timestamps), so ordering by it alone is not a total order: a plain
+            // "ORDER BY createdDate DESC LIMIT k*2" would let the store pick rows
+            // arbitrarily among equal timestamps, making the window's membership and
+            // ordering non-deterministic at the boundary. Pair createdDate with the
+            // primary key to impose a stable total order before the limit is applied.
             const recentMessages = await this.appDataSource.getRepository(this.databaseEntities['ChatMessage']).find({
                 where: {
                     sessionId: id,
                     chatflowid: this.chatflowid
                 },
                 order: {
-                    createdDate: 'DESC'
+                    createdDate: 'DESC',
+                    id: 'DESC'
                 },
                 take: this.k * 2
             })
