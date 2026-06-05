@@ -1,0 +1,29 @@
+version = "1.0"
+
+[task]
+name = "codimango/quanle_FlowiseAI__bufferwindow-memory-perf-ba6a089d-v2"
+authors = [{ name = "Quan Le", email = "quanle@meta.com" }]
+keywords = ["typescript", "llm", "flowise", "memory", "performance"]
+
+[metadata]
+author_name = "Quan Le"
+author_email = "quanle@meta.com"
+difficulty = "medium"
+category = "performance"
+languages = ["typescript"]
+tags = ["typescript", "llm", "ai-platform", "memory", "performance-optimization", "swe-bench-pro", "SWEBench-External"]
+
+[verifier]
+timeout_sec = 3000.0
+
+[agent]
+timeout_sec = 3000.0
+
+[environment]
+build_timeout_sec = 1800.0
+cpus = 4
+memory_mb = 16384
+storage_mb = 20480
+gpus = 0
+allow_internet = true
+mcp_servers = []
