@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "current_step": 3,
+  "started_at": "2026-06-05T12:00:00Z",
+  "last_updated": "2026-06-05T12:00:00Z",
+  "answers": {
+    "problem_type": "New feature",
+    "repo_url": "https://github.com/FlowiseAI/Flowise",
+    "base_commit_choice": "HEAD",
+    "base_commit_hash": "ba6a089d2bac19f5c07e8378e78bfd1af5d66019"
+  },
+  "repo_url": "https://github.com/FlowiseAI/Flowise",
+  "repo_name": "FlowiseAI/Flowise",
+  "base_commit": "ba6a089d2bac19f5c07e8378e78bfd1af5d66019",
+  "language": "typescript",
+  "task_dir": "quanle_FlowiseAI__disable-node-ba6a089d-v1",
+  "docker_built": true,
+  "instruction_written": false,
+  "solution_committed": false,
+  "tests_committed": false,
+  "qa_passed": false,
+  "models_tested": [],
+  "submitted": false,
+  "validation_passed": false,
+  "validation_attempts": 0,
+  "last_failure_phase": "",
+  "notes": ""
+}
