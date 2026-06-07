@@ -22,22 +22,10 @@ Implement an extension to **disable** a node. A node is enabled by default; bein
 
 6. When nothing is disabled, the flow should work as expected.
 
-## Implementation requirements
-
-Expose the rerouting logic as a standalone, unit-testable function:
-
-- Add and **export** a function named exactly `removeDisabledNodes` from
-  `packages/server/src/utils/index.ts`.
-- Call this function on the raw nodes and edges **before** `constructGraphs(...)` at
-  the flow-execution entry points, so the rest of the pipeline only sees enabled nodes.
-- When no node is disabled, return the **original array references unchanged** (return
-  the same `nodes` and `edges` that were passed in — do not copy or rebuild them).
-- When a disabled node is removed and its upstream and downstream neighbors are
-  reconnected, each rerouted edge must keep the `sourceHandle` of the surviving
-  upstream edge and the `targetHandle` of the surviving downstream edge.
-
 ## Constraints
 
 - Add the disable behavior above; do not change unrelated behavior.
 - Flows that contain no disabled nodes must produce exactly the same output as before this change.
 - Introduce no new dependencies. The project must type-check, build, and lint cleanly with no regressions.
+- Add and **export** a function named exactly `removeDisabledNodes` from
+`packages/server/src/utils/index.ts`.
