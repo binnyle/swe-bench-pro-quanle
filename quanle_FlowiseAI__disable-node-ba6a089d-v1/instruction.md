@@ -27,5 +27,4 @@ Implement an extension to **disable** a node. A node is enabled by default; bein
 - Add the disable behavior above; do not change unrelated behavior.
 - Flows that contain no disabled nodes must produce exactly the same output as before this change.
 - Introduce no new dependencies. The project must type-check, build, and lint cleanly with no regressions.
-- Add and **export** a function named exactly `removeDisabledNodes` from
-`packages/server/src/utils/index.ts`.
+- Add and **export** a function named exactly `removeDisabledNodes` to achieve this
