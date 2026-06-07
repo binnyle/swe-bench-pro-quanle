@@ -175,6 +175,26 @@ describe('removeDisabledNodes - Branching flows', () => {
     })
 })
 
+describe('removeDisabledNodes - Three-way fan-in disabled', () => {
+    test('disabling a node with three upstream sources reroutes all to its downstream', () => {
+        // A → B(disabled) → E
+        // C → B(disabled) → E
+        // D → B(disabled) → E
+        // becomes A → E, C → E, D → E
+        const nodes = [node('A'), node('B', true), node('C'), node('D'), node('E')]
+        const edges = [edge('A', 'B'), edge('C', 'B'), edge('D', 'B'), edge('B', 'E')]
+
+        const result = removeDisabledNodes(nodes, edges)
+
+        expect(result.nodes).toHaveLength(4)
+        expect(result.nodes.map((n: any) => n.id).sort()).toEqual(['A', 'C', 'D', 'E'])
+        expect(result.edges).toHaveLength(3)
+        const sources = result.edges.map((e: any) => e.source).sort()
+        expect(sources).toEqual(['A', 'C', 'D'])
+        expect(result.edges.every((e: any) => e.target === 'E')).toBe(true)
+    })
+})
+
 describe('removeDisabledNodes - Starting node fan-out', () => {
     test('disabling a starting node with multiple outputs makes all targets new starting nodes', () => {
         // A(disabled) → B, → C, → D
@@ -203,6 +223,46 @@ describe('removeDisabledNodes - Starting node fan-out', () => {
         expect(result.edges).toHaveLength(2)
         const edgePairs = result.edges.map((e: any) => `${e.source}->${e.target}`).sort()
         expect(edgePairs).toEqual(['B->E', 'C->F'])
+    })
+})
+
+describe('removeDisabledNodes - Partial fan-out disabled', () => {
+    test('disabling some fan-out targets keeps only enabled targets connected', () => {
+        // A → B(disabled)
+        // A → C(disabled)
+        // A → D
+        // becomes A → D only
+        const nodes = [node('A'), node('B', true), node('C', true), node('D')]
+        const edges = [edge('A', 'B'), edge('A', 'C'), edge('A', 'D')]
+
+        const result = removeDisabledNodes(nodes, edges)
+
+        expect(result.nodes).toHaveLength(2)
+        expect(result.nodes.map((n: any) => n.id).sort()).toEqual(['A', 'D'])
+        expect(result.edges).toHaveLength(1)
+        expect(result.edges[0].source).toBe('A')
+        expect(result.edges[0].target).toBe('D')
+    })
+
+    test('disabling fan-out targets with downstream reroutes through them', () => {
+        // A → B(disabled) → E
+        // A → C(disabled) → F
+        // A → D
+        // becomes A → D, A → E (rerouted through B), A → F (rerouted through C)
+        const nodes = [node('A'), node('B', true), node('C', true), node('D'), node('E'), node('F')]
+        const edges = [edge('A', 'B'), edge('A', 'C'), edge('A', 'D'), edge('B', 'E'), edge('C', 'F')]
+
+        const result = removeDisabledNodes(nodes, edges)
+
+        expect(result.nodes).toHaveLength(4)
+        expect(result.nodes.map((n: any) => n.id).sort()).toEqual(['A', 'D', 'E', 'F'])
+        expect(result.edges).toHaveLength(3)
+        const hasAtoD = result.edges.some((e: any) => e.source === 'A' && e.target === 'D')
+        const hasAtoE = result.edges.some((e: any) => e.source === 'A' && e.target === 'E')
+        const hasAtoF = result.edges.some((e: any) => e.source === 'A' && e.target === 'F')
+        expect(hasAtoD).toBe(true)
+        expect(hasAtoE).toBe(true)
+        expect(hasAtoF).toBe(true)
     })
 })
 

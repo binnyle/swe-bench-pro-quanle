@@ -2,7 +2,7 @@
 
 ## Problem
 
-Implement a feature to exclude a node from execution without deleting the node itself. A node can be marked as *disabled*. When the flow runs, that node should be treated as if it were not part of the flow, while the rest of the flow continues to run as a single connected whole.
+Implement a function in the server to exclude a node from execution without deleting the node itself. A node can be marked as *disabled*. When the flow runs, that node should be treated as if it were not part of the flow, while the rest of the flow continues to run as a single connected whole.
 
 ## Expected behavior
 
@@ -21,6 +21,20 @@ Implement an extension to **disable** a node. A node is enabled by default; bein
 5. If the disabled node was the flow's final node, the final node is now the upstream node(s).
 
 6. When nothing is disabled, the flow should work as expected.
+
+## Implementation requirements
+
+Expose the rerouting logic as a standalone, unit-testable function:
+
+- Add and **export** a function named exactly `removeDisabledNodes` from
+  `packages/server/src/utils/index.ts`.
+- Call this function on the raw nodes and edges **before** `constructGraphs(...)` at
+  the flow-execution entry points, so the rest of the pipeline only sees enabled nodes.
+- When no node is disabled, return the **original array references unchanged** (return
+  the same `nodes` and `edges` that were passed in — do not copy or rebuild them).
+- When a disabled node is removed and its upstream and downstream neighbors are
+  reconnected, each rerouted edge must keep the `sourceHandle` of the surviving
+  upstream edge and the `targetHandle` of the surviving downstream edge.
 
 ## Constraints
 
