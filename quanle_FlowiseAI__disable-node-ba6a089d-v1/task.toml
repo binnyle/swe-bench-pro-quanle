@@ -10,6 +10,8 @@ author_name = "Quan Le"
 author_email = "quanle@meta.com"
 difficulty = "medium"
 category = "feature"
+category_usecase = "process_data"
+category_subdomain = "algorithms_and_data_structures"
 languages = ["typescript"]
 tags = ["typescript", "llm", "ai-platform", "node-system", "swe-bench-pro", "SWEBench-External"]
 
