@@ -16,6 +16,12 @@ disabled nodes and returns the resulting nodes and edges.
 
 - After cleanup, there should be zero trace of any disabled node ensure there are no leftover edges pointing at them, no references to their outputs inside other nodes' inputs. If removing them would leave a broken connection for example a dangling link, a type mismatch, or a duplicate wire, fix it so the flow still works.
 
+- If the disabled node is between two node that are not the same type, drop them. Only re-connect nodes that are the same type
+
+- If there are node that used the disabled node output, use the output from the previous node that are the same type. If the disabled node had nothing feeding it, remove the reference entirely.
+
+- Two connections count as the same only if they share the start node, the end node, and both ports. If two connections go
+to the same node but through different ports, keep both
 
 ## Constraints
 
