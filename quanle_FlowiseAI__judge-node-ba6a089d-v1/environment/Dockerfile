@@ -18,7 +18,4 @@ RUN pnpm install --frozen-lockfile
 # Build the project
 RUN pnpm build
 
-# Strip git history so the agent container cannot inspect commits past the base
-RUN rm -rf /app/.git
-
 RUN mkdir -p /logs
