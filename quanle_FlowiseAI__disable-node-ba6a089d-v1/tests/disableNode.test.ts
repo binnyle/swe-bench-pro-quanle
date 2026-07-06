@@ -54,14 +54,14 @@ describe('removeDisabledNodes - No disabled nodes', () => {
         expect(result.nodes.map((n: any) => n.id)).toEqual(['A', 'B', 'C'])
     })
 
-    test('returns identical references when nothing is disabled', () => {
+    test('leaves nodes and edges intact when nothing is disabled', () => {
         const nodes = [node('A')]
         const edges: any[] = []
 
         const result = removeDisabledNodes(nodes, edges)
 
-        expect(result.nodes).toBe(nodes)
-        expect(result.edges).toBe(edges)
+        expect(result.nodes.map((n: any) => n.id)).toEqual(['A'])
+        expect(result.edges).toEqual([])
     })
 })
 
@@ -402,8 +402,8 @@ describe('removeDisabledNodes - Handle preservation', () => {
             target: 'B', targetHandle: 'B-input-model-BaseChatModel',
             type: 'buttonedge', id: 'e-A-B', data: { label: '' }
         }, {
-            source: 'B', sourceHandle: 'B-output-data-Output',
-            target: 'C', targetHandle: 'C-input-data-Input',
+            source: 'B', sourceHandle: 'B-output-model-BaseChatModel',
+            target: 'C', targetHandle: 'C-input-model-BaseChatModel',
             type: 'buttonedge', id: 'e-B-C', data: { label: '' }
         }]
 
@@ -413,7 +413,165 @@ describe('removeDisabledNodes - Handle preservation', () => {
         expect(result.edges[0].source).toBe('A')
         expect(result.edges[0].target).toBe('C')
         expect(result.edges[0].sourceHandle).toBe('A-output-model-BaseChatModel')
-        expect(result.edges[0].targetHandle).toBe('C-input-data-Input')
+        expect(result.edges[0].targetHandle).toBe('C-input-model-BaseChatModel')
+    })
+})
+
+describe('removeDisabledNodes - Convergent reroute deduplication', () => {
+    test('collapses identical rerouted edges through parallel disabled nodes', () => {
+        // S → D1(disabled) → T
+        // S → D2(disabled) → T
+        // Both paths reroute to the same S → T connection (identical handles),
+        // so the result must contain a single deduplicated edge, not two.
+        const nodes = [node('S'), node('D1', true), node('D2', true), node('T')]
+        const edges = [edge('S', 'D1'), edge('S', 'D2'), edge('D1', 'T'), edge('D2', 'T')]
+
+        const result = removeDisabledNodes(nodes, edges)
+
+        expect(result.nodes.map((n: any) => n.id).sort()).toEqual(['S', 'T'])
+        const sToT = result.edges.filter((e: any) => e.source === 'S' && e.target === 'T')
+        expect(sToT).toHaveLength(1)
+        expect(result.edges).toHaveLength(1)
+    })
+
+    test('keeps distinct parallel edges that differ only by handle', () => {
+        // S reaches T through two disabled nodes but on different handles,
+        // producing two genuinely distinct connections that must both survive.
+        const nodes = [node('S'), node('D1', true), node('D2', true), node('T')]
+        const edges = [
+            { source: 'S', sourceHandle: 'S-out-a', target: 'D1', targetHandle: 'D1-in', type: 'buttonedge', id: 'e1', data: { label: '' } },
+            { source: 'D1', sourceHandle: 'D1-out', target: 'T', targetHandle: 'T-in-a', type: 'buttonedge', id: 'e2', data: { label: '' } },
+            { source: 'S', sourceHandle: 'S-out-b', target: 'D2', targetHandle: 'D2-in', type: 'buttonedge', id: 'e3', data: { label: '' } },
+            { source: 'D2', sourceHandle: 'D2-out', target: 'T', targetHandle: 'T-in-b', type: 'buttonedge', id: 'e4', data: { label: '' } }
+        ]
+
+        const result = removeDisabledNodes(nodes, edges)
+
+        const sToT = result.edges.filter((e: any) => e.source === 'S' && e.target === 'T')
+        expect(sToT).toHaveLength(2)
+        const handlePairs = sToT.map((e: any) => `${e.sourceHandle}->${e.targetHandle}`).sort()
+        expect(handlePairs).toEqual(['S-out-a->T-in-a', 'S-out-b->T-in-b'])
+    })
+})
+
+describe('removeDisabledNodes - Multi-hop handle preservation', () => {
+    test('preserves upstream sourceHandle and final targetHandle across a two-hop disabled chain that branches', () => {
+        // A → B(disabled) → C(disabled) → D
+        //                 → E            (B also fans out to enabled E)
+        // Every surviving edge originates at A and must carry A's original
+        // sourceHandle, while each targetHandle comes from the final hop into
+        // the enabled node — never an intermediate disabled node's handle.
+        const nodes = [node('A'), node('B', true), node('C', true), node('D'), node('E')]
+        const edges = [
+            { source: 'A', sourceHandle: 'A-output-model-BaseChatModel', target: 'B', targetHandle: 'B-input-model-BaseChatModel', type: 'buttonedge', id: 'e-A-B', data: { label: '' } },
+            { source: 'B', sourceHandle: 'B-output-model-BaseChatModel', target: 'C', targetHandle: 'C-input-model-BaseChatModel', type: 'buttonedge', id: 'e-B-C', data: { label: '' } },
+            { source: 'C', sourceHandle: 'C-output-model-BaseChatModel', target: 'D', targetHandle: 'D-input-model-BaseChatModel', type: 'buttonedge', id: 'e-C-D', data: { label: '' } },
+            { source: 'B', sourceHandle: 'B-output-model-BaseChatModel', target: 'E', targetHandle: 'E-input-model-BaseChatModel', type: 'buttonedge', id: 'e-B-E', data: { label: '' } }
+        ]
+
+        const result = removeDisabledNodes(nodes, edges)
+
+        expect(result.nodes.map((n: any) => n.id).sort()).toEqual(['A', 'D', 'E'])
+        expect(result.edges).toHaveLength(2)
+        const aToD = result.edges.find((e: any) => e.target === 'D')
+        const aToE = result.edges.find((e: any) => e.target === 'E')
+        expect(aToD.source).toBe('A')
+        expect(aToD.sourceHandle).toBe('A-output-model-BaseChatModel')
+        expect(aToD.targetHandle).toBe('D-input-model-BaseChatModel')
+        expect(aToE.source).toBe('A')
+        expect(aToE.sourceHandle).toBe('A-output-model-BaseChatModel')
+        expect(aToE.targetHandle).toBe('E-input-model-BaseChatModel')
+    })
+})
+
+describe('removeDisabledNodes - Type-compatible rerouting', () => {
+    test('drops a rerouted edge when upstream output type is incompatible with downstream input type', () => {
+        // A(output: BaseChatModel) → B(disabled) → C(input: Document)
+        // The disabled node bridged two incompatible types, so removing it must
+        // NOT create an invalid A → C connection — no edge should survive.
+        const nodes = [node('A'), node('B', true), node('C')]
+        const edges = [
+            { source: 'A', sourceHandle: 'A-output-model-BaseChatModel', target: 'B', targetHandle: 'B-input-model-BaseChatModel', type: 'buttonedge', id: 'e-A-B', data: { label: '' } },
+            { source: 'B', sourceHandle: 'B-output-doc-Document', target: 'C', targetHandle: 'C-input-doc-Document', type: 'buttonedge', id: 'e-B-C', data: { label: '' } }
+        ]
+
+        const result = removeDisabledNodes(nodes, edges)
+
+        expect(result.nodes.map((n: any) => n.id).sort()).toEqual(['A', 'C'])
+        expect(result.edges).toHaveLength(0)
+    })
+
+    test('reroutes only type-matching pairs across a disabled fan-in/fan-out hub', () => {
+        // A(BaseChatModel) →              → Agent(input: BaseChatModel)
+        //                    D(disabled)
+        // M(Memory)        →              → Store(input: Memory)
+        // Blind cartesian rerouting would emit 4 edges; only the two
+        // type-compatible pairs (A→Agent, M→Store) may survive.
+        const nodes = [node('A'), node('M'), node('D', true), node('Agent'), node('Store')]
+        const edges = [
+            { source: 'A', sourceHandle: 'A-output-model-BaseChatModel', target: 'D', targetHandle: 'D-input-a-BaseChatModel', type: 'buttonedge', id: 'e-A-D', data: { label: '' } },
+            { source: 'M', sourceHandle: 'M-output-mem-Memory', target: 'D', targetHandle: 'D-input-b-Memory', type: 'buttonedge', id: 'e-M-D', data: { label: '' } },
+            { source: 'D', sourceHandle: 'D-output-a-BaseChatModel', target: 'Agent', targetHandle: 'Agent-input-model-BaseChatModel', type: 'buttonedge', id: 'e-D-Agent', data: { label: '' } },
+            { source: 'D', sourceHandle: 'D-output-b-Memory', target: 'Store', targetHandle: 'Store-input-mem-Memory', type: 'buttonedge', id: 'e-D-Store', data: { label: '' } }
+        ]
+
+        const result = removeDisabledNodes(nodes, edges)
+
+        expect(result.nodes.map((n: any) => n.id).sort()).toEqual(['A', 'Agent', 'M', 'Store'])
+        expect(result.edges).toHaveLength(2)
+        const pairs = result.edges.map((e: any) => `${e.source}->${e.target}`).sort()
+        expect(pairs).toEqual(['A->Agent', 'M->Store'])
+        const aToAgent = result.edges.find((e: any) => e.source === 'A')
+        expect(aToAgent.sourceHandle).toBe('A-output-model-BaseChatModel')
+        expect(aToAgent.targetHandle).toBe('Agent-input-model-BaseChatModel')
+    })
+})
+
+describe('removeDisabledNodes - Cross-node reference rewiring', () => {
+    // A node whose input field references a disabled node's output via a
+    // {{<id>.data.instance}} template must not be left with a dead reference.
+    function refNode(id: string, inputs: any, disabled = false): any {
+        const n = node(id, disabled)
+        n.data.inputs = inputs
+        return n
+    }
+
+    test('rewrites a reference to the disabled node to its enabled upstream', () => {
+        // A → B(disabled) → C, and C.inputs.model references {{B.data.instance}}.
+        // B is removed, A → C is rerouted, and C's reference must now point at A.
+        const nodes = [node('A'), node('B', true), refNode('C', { model: '{{B.data.instance}}' })]
+        const edges = [edge('A', 'B'), edge('B', 'C')]
+
+        const result = removeDisabledNodes(nodes, edges)
+
+        const c = result.nodes.find((n: any) => n.id === 'C')
+        expect(c.data.inputs.model).toBe('{{A.data.instance}}')
+        // and no surviving input may still mention the disabled node id
+        expect(JSON.stringify(result.nodes)).not.toContain('{{B.data.instance')
+    })
+
+    test('preserves the trailing path when rewriting a reference', () => {
+        // C.inputs.memory references {{B.data.instance.sessionId}} → {{A.data.instance.sessionId}}
+        const nodes = [node('A'), node('B', true), refNode('C', { memory: 'x {{B.data.instance.sessionId}} y' })]
+        const edges = [edge('A', 'B'), edge('B', 'C')]
+
+        const result = removeDisabledNodes(nodes, edges)
+
+        const c = result.nodes.find((n: any) => n.id === 'C')
+        expect(c.data.inputs.memory).toBe('x {{A.data.instance.sessionId}} y')
+    })
+
+    test('drops a reference to a disabled node that has no enabled upstream', () => {
+        // B(disabled) is a starting node (nothing feeds it); C references it.
+        // The referenced value no longer exists, so the reference is removed.
+        const nodes = [node('B', true), refNode('C', { model: '{{B.data.instance}}' })]
+        const edges = [edge('B', 'C')]
+
+        const result = removeDisabledNodes(nodes, edges)
+
+        const c = result.nodes.find((n: any) => n.id === 'C')
+        expect(c.data.inputs.model).toBe('')
+        expect(JSON.stringify(result.nodes)).not.toContain('{{B.data.instance')
     })
 })
 

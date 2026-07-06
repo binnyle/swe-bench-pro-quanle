@@ -15,7 +15,12 @@ SWE-Bench Pro task for FlowiseAI/Flowise — TypeScript
 ## Model Analysis
 
 ### Oracle
-3/3 passed. Reference solution is stable and reproduces the expected 25 `fail_to_pass` tests.
+Passes all 28 `fail_to_pass` tests. Reference solution is stable.
+
+> **Note:** The test suite was hardened (25 → 28 tests) by adding convergent-reroute
+> deduplication and multi-hop handle-preservation cases. The per-model rates below
+> predate that change and will be re-measured; the reference solution was extended to
+> deduplicate rerouted edges by full identity (source, target, and both handles).
 
 ### Opus 4.6
 5/5 passed. Correctly handled all rerouting cases including handle preservation.
