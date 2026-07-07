@@ -29,4 +29,4 @@ to the same node but through different ports, keep both
 - Flows that contain no disabled nodes must produce exactly the same output as
 before this change.
 - Introduce no new dependencies. The project must work properly like before
-- Add and export a function named removeDisabledNodes that removes the disabled nodes and returns the resulting nodes and edges.
+- Add and export a function named removeDisabledNodes that removes the disabled nodes and returns the resulting nodes and edges. The function must be added to and exported from the server's utils

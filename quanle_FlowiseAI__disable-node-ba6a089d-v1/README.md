@@ -23,11 +23,11 @@ Measured on the current hardened 33-test suite:
 > and Avocado were re-measured on the 33-test suite; the Opus/GPT rates above predate
 > hardening and are not yet re-measured on the current suite.
 >
-> The Avocado 0/5 above was measured while the spec left the type-compatibility,
-> reference-rewiring, and dedup-identity rules implicit. The instruction was later
-> clarified to state those rules explicitly (for spec fairness); Avocado should be
-> re-measured against the clarified spec, as making those rules explicit may raise
-> its pass rate.
+> The Avocado 0/5 was confirmed against the **clarified, fully-specified** instruction
+> (type-compatibility, reference-rewiring, and dedup-identity rules all stated, plus the
+> required export location). Every trial exports the function and passes the structural
+> cases; failures are genuine logic gaps, not setup or location-guessing artifacts. The
+> task is therefore both spec-fair (AI assessment: Accept) and hard for Avocado.
 
 ## Model Analysis
 
@@ -43,9 +43,9 @@ in every trial) but consistently fails the semantic dimensions added during hard
 
 | Failure Mode | Trials Affected | Note |
 |-------------|-----------------|------|
-| Type-compatible rerouting (drops incompatible / only type-matching pairs) | 4/5 | Blind cartesian rerouting — emits type-invalid edges |
-| Cross-node reference rewiring (repoint `{{id.data.instance}}` to upstream / drop) | 1/5 | Graph-rewrite ignores `node.data.inputs` entirely |
-| Convergent-reroute dedup (keep distinct-by-handle) | 1/5 | Deduped on source/target instead of full identity |
+| Type-compatible rerouting (drops incompatible / only type-matching pairs) | 5/5 | Connects mismatched types despite the spec stating the rule — doesn't derive types from handles |
+| Cross-node reference rewiring (drop `{{id.data.instance}}` when no upstream) | 2/5 | Handles the repoint case but not the empty-when-no-upstream case |
+| Broader rerouting bug (core reroute/chain cases) | 1/5 | One trial's solution mishandled basic middle/chain/fan rerouting |
 
 These reflect reasoning gaps, not setup issues:
 - **Type compatibility.** Reconnecting neighbours across a removed node must respect
