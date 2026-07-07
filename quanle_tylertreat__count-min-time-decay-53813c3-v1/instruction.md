@@ -34,13 +34,18 @@ naturally decay over time.
 8. A new `Subtract(other *CountMinSketch) error` method must compute the per-cell
 difference between this sketch and another. Cells that would underflow to negative
 values must be clamped to zero. The sketches must have matching dimensions and
-decay rates (return an error otherwise). After subtraction, `TotalCount()` must be
+decay rates (return an error otherwise). After subtraction, TotalCount() must be
 recomputed from the matrix, not from the stored count field.
 
-9. A new `CountDiff(data []byte, other *CountMinSketch) int64` method must return the
+9. A new CountDiff(data []byte, other *CountMinSketch) int64 method must return the
 signed frequency difference for a specific element between this sketch and another.
 The difference must be computed per-cell (subtract corresponding cells) then take
 the minimum across rows — NOT by subtracting the two Count() results.
+
+10. Name the constructor exactly — NewCountMinSketchWithDecay(...).
+
+11. Decay must return a value
+
 
 ## Constraints
 
