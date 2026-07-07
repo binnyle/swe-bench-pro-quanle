@@ -2,7 +2,7 @@
 
 ## Description
 
-Add time-decay support to the Count-Min Sketch implementation in the BoomFilters Go library. The existing CMS tracks cumulative event frequencies with no notion of time. This task requires implementing exponential decay (count * e^(-λt)) so that frequency estimates naturally decrease over time, enabling streaming use cases like trending topic detection and rate limiting. The agent must modify the existing `countmin.go` to add a new constructor, decay-aware Add/Count/Merge/Serialize methods, and an explicit Decay() method — all while maintaining full backward compatibility with the existing API.
+Add time-decay support to the Count-Min Sketch implementation in the BoomFilters Go library. The existing CMS tracks cumulative event frequencies with no notion of time. This task requires implementing exponential decay (count * e^(-λt)) so that frequency estimates naturally decrease over time, enabling streaming use cases like trending topic detection and rate limiting. The agent must modify the existing `countmin.go` to add a new constructor (`NewCountMinSketchWithDecay`), decay-aware Add/Count/Merge/Serialize methods, an explicit `Decay()` method (which returns the sketch), and `Subtract`/`CountDiff` operations — all while maintaining full backward compatibility with the existing API.
 
 A naive approach that only applies decay in Count() will fail the Add-after-decay test (new items must be counted at full value). The agent must correctly apply decay before incrementing counters, handle merge of sketches with different timestamps, and preserve decay state through serialization.
 
