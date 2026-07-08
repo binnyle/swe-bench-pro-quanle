@@ -2,6 +2,8 @@ version = "1.0"
 
 [task]
 name = "codimango/quanle_FlowiseAI__judge-node-ba6a089d-v1"
+format = "swe_bench_single_turn"
+workstream = "swe_public_repo"
 authors = [{ name = "Quan Le", email = "quanle@meta.com" }]
 keywords = ["typescript", "llm", "flowise", "node"]
 

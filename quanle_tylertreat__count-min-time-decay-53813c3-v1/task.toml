@@ -2,6 +2,8 @@ version = "1.0"
 
 [task]
 name = "codimango/quanle_tylertreat__count-min-time-decay-53813c3-v1"
+format = "swe_bench_single_turn"
+workstream = "swe_public_repo"
 authors = [{ name = "Quan Le", email = "quanle@meta.com" }]
 keywords = ["go", "probabilistic-data-structures", "count-min-sketch", "time-decay"]
 
