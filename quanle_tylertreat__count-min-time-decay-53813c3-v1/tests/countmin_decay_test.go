@@ -41,79 +41,86 @@ func TestZeroDecayBehavior(t *testing.T) {
 	}
 }
 
-// TestDecayReducesCounts ensures that counts decrease after time passes.
+// TestDecayReducesCounts ensures counts halve after exactly one half-life.
+// Uses an injected deterministic clock (no real sleep) so the result is exact.
 func TestDecayReducesCounts(t *testing.T) {
 	halfLife := 1 * time.Second
 	cms := NewCountMinSketchWithDecay(0.001, 0.99, halfLife)
+	base := time.Unix(1000000, 0)
+	now := base
+	cms.timeFunc = func() time.Time { return now }
+	cms.lastDecay = base
 
-	// Add 1000 of item "a"
 	cms.AddN([]byte("a"), 1000)
-
-	if count := cms.Count([]byte("a")); count < 990 {
-		t.Errorf("expected ~1000 before significant decay, got %d", count)
+	if count := cms.Count([]byte("a")); count != 1000 {
+		t.Errorf("expected 1000 before any elapsed time, got %d", count)
 	}
 
-	// Wait for one half-life
-	time.Sleep(1100 * time.Millisecond)
-
-	// Count should be approximately 500 (half)
-	count := cms.Count([]byte("a"))
-	if count < 400 || count > 600 {
-		t.Errorf("expected ~500 after one half-life, got %d", count)
+	// Advance exactly one half-life: count must be exactly 1000 * 0.5 = 500.
+	now = base.Add(halfLife)
+	if count := cms.Count([]byte("a")); count != 500 {
+		t.Errorf("expected exactly 500 after one half-life, got %d", count)
 	}
 }
 
-// TestDecayAfterTwoHalfLives ensures counts quarter after two half-lives.
+// TestDecayAfterTwoHalfLives ensures counts quarter after two half-lives (exact,
+// injected clock).
 func TestDecayAfterTwoHalfLives(t *testing.T) {
 	halfLife := 500 * time.Millisecond
 	cms := NewCountMinSketchWithDecay(0.001, 0.99, halfLife)
+	base := time.Unix(1000000, 0)
+	now := base
+	cms.timeFunc = func() time.Time { return now }
+	cms.lastDecay = base
 
 	cms.AddN([]byte("x"), 1000)
 
-	// Wait two half-lives
-	time.Sleep(1100 * time.Millisecond)
-
+	// Advance two half-lives in one step: 1000 * exp(-2ln2) = 1000 * 0.25 = 250.
+	now = base.Add(2 * halfLife)
 	count := cms.Count([]byte("x"))
-	// Should be ~250 (1000 * 0.25)
-	if count < 150 || count > 350 {
-		t.Errorf("expected ~250 after two half-lives, got %d", count)
+	if count != 250 {
+		t.Errorf("expected exactly 250 after two half-lives, got %d", count)
 	}
 }
 
-// TestAddAfterDecay ensures new items are counted at full value after decay.
+// TestAddAfterDecay ensures new items are counted at full value after decay
+// (exact, injected clock): decay must be applied BEFORE the increment.
 func TestAddAfterDecay(t *testing.T) {
 	halfLife := 500 * time.Millisecond
 	cms := NewCountMinSketchWithDecay(0.001, 0.99, halfLife)
+	base := time.Unix(1000000, 0)
+	now := base
+	cms.timeFunc = func() time.Time { return now }
+	cms.lastDecay = base
 
 	cms.AddN([]byte("old"), 1000)
 
-	// Wait one half-life
-	time.Sleep(600 * time.Millisecond)
-
-	// Add new item
+	// Advance one half-life, then add a new item. The AddN must decay "old"
+	// (1000 -> 500) before adding "new" at full value (100).
+	now = base.Add(halfLife)
 	cms.AddN([]byte("new"), 100)
 
-	// "old" should be ~500
-	oldCount := cms.Count([]byte("old"))
-	if oldCount < 400 || oldCount > 600 {
-		t.Errorf("expected ~500 for old item, got %d", oldCount)
+	if oldCount := cms.Count([]byte("old")); oldCount != 500 {
+		t.Errorf("expected exactly 500 for old item, got %d", oldCount)
 	}
-
-	// "new" should be ~100 (added after decay, minimal additional decay)
-	newCount := cms.Count([]byte("new"))
-	if newCount < 90 || newCount > 110 {
-		t.Errorf("expected ~100 for new item, got %d", newCount)
+	if newCount := cms.Count([]byte("new")); newCount != 100 {
+		t.Errorf("expected exactly 100 for new item (added after decay), got %d", newCount)
 	}
 }
 
-// TestDecayMethod ensures explicit Decay() works.
+// TestDecayMethod ensures explicit Decay() works and returns self (exact,
+// injected clock).
 func TestDecayMethod(t *testing.T) {
 	halfLife := 500 * time.Millisecond
 	cms := NewCountMinSketchWithDecay(0.001, 0.99, halfLife)
+	base := time.Unix(1000000, 0)
+	now := base
+	cms.timeFunc = func() time.Time { return now }
+	cms.lastDecay = base
 
 	cms.AddN([]byte("a"), 1000)
 
-	time.Sleep(600 * time.Millisecond)
+	now = base.Add(halfLife)
 	result := cms.Decay()
 
 	// Should return self for chaining
@@ -122,51 +129,59 @@ func TestDecayMethod(t *testing.T) {
 	}
 
 	count := cms.Count([]byte("a"))
-	if count < 400 || count > 600 {
-		t.Errorf("expected ~500 after explicit decay, got %d", count)
+	if count != 500 {
+		t.Errorf("expected exactly 500 after explicit decay, got %d", count)
 	}
 }
 
-// TestTotalCountDecays ensures TotalCount reflects decay.
+// TestTotalCountDecays ensures TotalCount reflects decay (exact, injected clock).
 func TestTotalCountDecays(t *testing.T) {
 	halfLife := 500 * time.Millisecond
 	cms := NewCountMinSketchWithDecay(0.001, 0.99, halfLife)
+	base := time.Unix(1000000, 0)
+	now := base
+	cms.timeFunc = func() time.Time { return now }
+	cms.lastDecay = base
 
 	cms.AddN([]byte("a"), 1000)
 
-	if total := cms.TotalCount(); total < 990 {
-		t.Errorf("expected ~1000 before significant decay, got %d", total)
+	if total := cms.TotalCount(); total != 1000 {
+		t.Errorf("expected 1000 before any elapsed time, got %d", total)
 	}
 
-	time.Sleep(600 * time.Millisecond)
-
-	total := cms.TotalCount()
-	if total < 400 || total > 600 {
-		t.Errorf("expected ~500 total after decay, got %d", total)
+	now = base.Add(halfLife)
+	if total := cms.TotalCount(); total != 500 {
+		t.Errorf("expected exactly 500 total after one half-life, got %d", total)
 	}
 }
 
-// TestMergeDecayedSketches ensures merge works with decayed sketches.
+// TestMergeDecayedSketches ensures merge decays both sketches first (exact,
+// injected clock): 500 + 500 = 1000.
 func TestMergeDecayedSketches(t *testing.T) {
 	halfLife := 500 * time.Millisecond
+	base := time.Unix(1000000, 0)
+	now := base
+	clock := func() time.Time { return now }
+
 	cms1 := NewCountMinSketchWithDecay(0.001, 0.99, halfLife)
+	cms1.timeFunc = clock
+	cms1.lastDecay = base
 	cms2 := NewCountMinSketchWithDecay(0.001, 0.99, halfLife)
+	cms2.timeFunc = clock
+	cms2.lastDecay = base
 
 	cms1.AddN([]byte("a"), 1000)
 	cms2.AddN([]byte("a"), 1000)
 
-	// Wait one half-life for both
-	time.Sleep(600 * time.Millisecond)
-
-	err := cms1.Merge(cms2)
-	if err != nil {
+	// Advance one half-life: Merge decays each (1000 -> 500) then sums -> 1000.
+	now = base.Add(halfLife)
+	if err := cms1.Merge(cms2); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	// Both decayed ~500 each, merged ~1000
 	count := cms1.Count([]byte("a"))
-	if count < 800 || count > 1200 {
-		t.Errorf("expected ~1000 after merge, got %d", count)
+	if count != 1000 {
+		t.Errorf("expected exactly 1000 after merging two decayed sketches, got %d", count)
 	}
 }
 
@@ -184,8 +199,11 @@ func TestMergeDecayRateMismatch(t *testing.T) {
 // TestSerializationWithDecay ensures decay state survives serialization.
 func TestSerializationWithDecay(t *testing.T) {
 	halfLife := 10 * time.Second
-	cms := NewCountMinSketchWithDecay(0.001, 0.99, halfLife)
+	base := time.Unix(1000000, 0)
 
+	cms := NewCountMinSketchWithDecay(0.001, 0.99, halfLife)
+	cms.timeFunc = func() time.Time { return base }
+	cms.lastDecay = base
 	cms.AddN([]byte("a"), 1000)
 
 	// Serialize
@@ -202,9 +220,11 @@ func TestSerializationWithDecay(t *testing.T) {
 		t.Fatalf("ReadDataFrom error: %v", err)
 	}
 
-	// Counts should match (allow ±5 for float64 rounding + minimal decay during test)
-	if count := cms2.Count([]byte("a")); count < 995 || count > 1005 {
-		t.Errorf("expected ~1000 after deserialization, got %d", count)
+	// Freeze the deserialized sketch's clock at the restored last-decay time so no
+	// time elapses: the count must match the original exactly (state preserved).
+	cms2.timeFunc = func() time.Time { return base }
+	if count := cms2.Count([]byte("a")); count != 1000 {
+		t.Errorf("expected exactly 1000 after deserialization, got %d", count)
 	}
 }
 
