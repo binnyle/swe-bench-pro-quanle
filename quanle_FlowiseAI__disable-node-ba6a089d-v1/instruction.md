@@ -14,7 +14,7 @@ disabled nodes and returns the resulting nodes and edges.
 
 - Disabled nodes are ignore and data can pass through. data that was flowing into it should now flow directly to wherever it was going out of it. If there are nodes before and after it, the before should be connected to the after.
 
-- After cleanup, there should be zero trace of any disabled node ensure there are no leftover edges pointing at them, no references to their outputs inside other nodes' inputs. If removing them would leave a broken connection for example a dangling link, a type mismatch, or a duplicate wire, fix it so the flow still works.
+- After cleanup, there should be no leftover edges pointing at disabled node. No references to their outputs inside other nodes' inputs. If removing them would leave a broken connection for example a dangling link, a type mismatch, or a duplicate wire, fix it so the flow still works.
 
 - If the disabled node is between two node that are not the same type, drop them. Only re-connect nodes that are the same type
 

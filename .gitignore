@@ -1,3 +1,6 @@
 jobs/
 .review/
 demo/
+
+# Accepted task markers (local-only, synced from codimango)
+.accepted
