@@ -1,0 +1,27 @@
+{
+  "repo": "firecrawl/firecrawl",
+  "instance_id": "quanle-firecrawl-pdf-page-router-cc32c6e-v1-pdf-ocr",
+  "base_commit": "cc32c6eb656405faf067ebfcbe6b76eb8818b27f",
+  "patch": "",
+  "test_patch": "diff --git a/apps/api/src/scraper/scrapeURL/engines/pdf/__tests__/pageRouting.test.ts b/apps/api/src/scraper/scrapeURL/engines/pdf/__tests__/pageRouting.test.ts\nnew file mode 100644\nindex 0000000..37a5fd8\n--- /dev/null\n+++ b/apps/api/src/scraper/scrapeURL/engines/pdf/__tests__/pageRouting.test.ts\n@@ -0,0 +1 @@\n+import \"/tests/pageRouting.test\";\n",
+  "fail_to_pass": [
+    "buildPdfPageRoutingPlan > exports all four evaluated functions",
+    "buildPdfPageRoutingPlan > returns one ordered one-based route for every processed page",
+    "buildPdfPageRoutingPlan > deduplicates OCR pages and safely ignores invalid or out-of-range values",
+    "executePdfPageRouting > uses the bundled detector and recognizer for only routed OCR pages",
+    "executePdfPageRouting > does not leave rendered page images in the configured temporary directory",
+    "assemblePdfPageResults > reconstructs column-aware OCR order and assembles deterministic page Markdown",
+    "assemblePdfPageResults > reports failed or missing pages instead of silently dropping them",
+    "summarizePdfPageRouting > derives required telemetry from the actual plan, execution, and assembly",
+    "page-aware PDF routing integration > produces ordered mixed-parser Markdown from the hidden six-page PDF fixture"
+  ],
+  "pass_to_pass": [
+    "isPdfBuffer > detects a standard PDF-1.4 header",
+    "isPdfBuffer > rejects HTML content"
+  ],
+  "selected_test_files_to_run": [
+    "apps/api/src/scraper/scrapeURL/engines/pdf/__tests__/pageRouting.test.ts",
+    "apps/api/src/scraper/scrapeURL/engines/pdf/__tests__/isPdfBuffer.test.ts"
+  ],
+  "before_repo_set_cmd": ""
+}
